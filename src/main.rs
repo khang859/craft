@@ -29,8 +29,18 @@ fn main() {
                 Err(e) => println!("Something went wrong {}", e),
             }
         }
-        Commands::Decrypt => println!("decrypt"),
+        Commands::Decrypt => {
+            let decryption = handle_decrypt(&command_config.option, key, iv);
+            match decryption {
+                Ok(_) => println!("Successfully decrypted file {}", command_config.option),
+                Err(e) => println!("Something went wrong {}", e),
+            }
+        } 
     }
+}
+
+fn handle_decrypt(option: &String, key: &[u8], iv: &[u8]) -> Result<(), Error> {
+    todo!("Implement");
 }
 
 fn handle_encrypt(option: &String, key: &[u8], iv: &[u8]) -> Result<(), Error> {
