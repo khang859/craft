@@ -15,7 +15,7 @@ fn main() {
         exit(1);
     });
 
-    // Todo: Add adctual password input process; 
+    // Todo: Add adctual password input process;
     let key = b"0123456789abcdef0123456789abcdef";
 
     // Todo: Save IV somewhere else;
@@ -35,12 +35,60 @@ fn main() {
                 Ok(_) => println!("Successfully decrypted file {}", command_config.option),
                 Err(e) => println!("Something went wrong {}", e),
             }
-        } 
+        }
     }
 }
 
 fn handle_decrypt(option: &String, key: &[u8], iv: &[u8]) -> Result<(), Error> {
-    todo!("Implement");
+    match fs::metadata(option) {
+        Ok(metadata) => {
+            if !metadata.is_file() {
+                return Err(anyhow!("Target needs to be a file"));
+            }
+
+            let encrypted_content = fs::read(option);
+
+            match encrypted_content {
+                Ok(content) => {
+                    let mut decrypter =
+                        Crypter::new(Cipher::aes_256_cbc(), Mode::Decrypt, key, Some(iv))?;
+
+                    let block_size = Cipher::aes_256_cbc().block_size();
+                    let mut decrypted_data = vec![0; content.len() + block_size];
+                    let count = decrypter.update(&content, &mut decrypted_data)?;
+                    let rest = decrypter.finalize(&mut decrypted_data[count..])?;
+                    decrypted_data.truncate(count + rest);
+
+                    let decrypted_file_name = option.clone();
+                    let decrypted_file_name: Vec<&str> = decrypted_file_name.split("/").collect();
+                    let decrypted_file_name =
+                        decrypted_file_name.get(decrypted_file_name.len() - 1);
+
+                    if let Some(file_name) = decrypted_file_name {
+                        println!("{:?}", file_name);
+
+                        let file_name: Vec<&str> = file_name.split(".").collect();
+                        let file_name = file_name.get(0..2);
+
+                        if let Some(file_strs) = file_name {
+                            let finalized_file_name = file_strs.join(".");
+
+                            let mut output_file = File::create(finalized_file_name.clone())?;
+                            output_file.write_all(&decrypted_data)?;
+                        }
+                    }
+
+                    return Ok(());
+                }
+                Err(e) => {
+                    return Err(anyhow!("Couldn't read file content {}", e));
+                }
+            }
+        }
+        Err(e) => {
+            return Err(anyhow!("Couldn't read file metadata {}", e));
+        }
+    }
 }
 
 fn handle_encrypt(option: &String, key: &[u8], iv: &[u8]) -> Result<(), Error> {
