@@ -48,6 +48,7 @@ impl CommandsConfig {
 pub enum Commands {
     Encrypt,
     Decrypt,
+    GitClean
 }
 
 impl FromStr for Commands {
@@ -57,6 +58,7 @@ impl FromStr for Commands {
         match s {
             "encrypt" => Ok(Commands::Encrypt),
             "decrypt" => Ok(Commands::Decrypt),
+            "gitclean" => Ok(Commands::GitClean),
             _ => Err(anyhow!("Invalid command")),
         }
     }
