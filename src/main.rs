@@ -1,5 +1,6 @@
+use encryptions::Encryption;
+
 use crate::commands::{Commands, CommandsConfig};
-use crate::encryptions::{handle_decrypt, handle_encrypt};
 use std::process::exit;
 
 mod commands;
@@ -18,17 +19,19 @@ fn main() {
 
     // Todo: Save IV somewhere else;
     let iv = b"1234567890abcdef";
+    
+    let encryption = Encryption::new(key, iv);
 
     match command_config.command {
         Commands::Encrypt => {
-            let encryption = handle_encrypt(&command_config.option, key, iv);
+            let encryption = encryption.handle_encrypt(&command_config.option);
             match encryption {
                 Ok(_) => println!("Successfully encrypted file {}", command_config.option),
                 Err(e) => println!("Something went wrong {}", e),
             }
         }
         Commands::Decrypt => {
-            let decryption = handle_decrypt(&command_config.option, key, iv);
+            let decryption = encryption.handle_decrypt(&command_config.option);
             match decryption {
                 Ok(_) => println!("Successfully decrypted file {}", command_config.option),
                 Err(e) => println!("Something went wrong {}", e),
