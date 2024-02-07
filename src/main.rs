@@ -1,10 +1,12 @@
 use encryptions::Encryption;
+use gitclean::handle_gitclean;
 
 use crate::commands::{Commands, CommandsConfig};
 use std::process::exit;
 
 mod commands;
 mod encryptions;
+mod gitclean;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -37,6 +39,8 @@ fn main() {
                 Err(e) => println!("Something went wrong {}", e),
             }
         }
-        _ => println!("Unregnized command"),
+        Commands::GitClean => {
+            let _ = handle_gitclean(command_config.option);
+        }
     }
 }
