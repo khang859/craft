@@ -168,17 +168,29 @@ mod encryption_tests {
                     assert_eq!(decrypted_content.trim_end(), content);
                 }
             }
+        } else {
+            println!("Setup failed");
+            assert!(false);
         }
     }
 
     #[test]
     fn file_dont_exist() {
-        let (_, encryption) = setup().unwrap();
-        let file_path = "fake_file_path.txt";
-        let result = encryption.handle_decrypt(&file_path.to_string());
-        assert!(result.is_err());
+        let setup_result = setup();
 
-        let result = encryption.handle_encrypt(&file_path.to_string());
-        assert!(result.is_err());
+        match setup_result {
+            Ok((_, encryption)) => {
+                let file_path = "fake_file_path.txt";
+                let result = encryption.handle_decrypt(&file_path.to_string());
+                assert!(result.is_err());
+
+                let result = encryption.handle_encrypt(&file_path.to_string());
+                assert!(result.is_err());
+            }
+            Err(_) => {
+                println!("Setup failed");
+                assert!(false);
+            }
+        }
     }
 }
