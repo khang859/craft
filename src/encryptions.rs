@@ -111,3 +111,74 @@ impl<'a> Encryption<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod encryption_tests {
+    use std::io::Read;
+
+    use super::*;
+    use tempfile::tempdir;
+
+    fn setup() -> Result<(tempfile::TempDir, Encryption<'static>), Error> {
+        let dir = tempdir();
+
+        match dir {
+            Ok(temp_dir) => {
+                let key = b"lkwiekfgmjwkdjalwprktlwudkskdmkw";
+                let iv = b"koskemwldkowmekw";
+                let encryption = Encryption::new(&key, &iv);
+                return Ok((temp_dir, encryption));
+            }
+            Err(create_temp_dir_failed) => {
+                assert!(false);
+                return Err(anyhow!(
+                    "Unable to create temp directory {}",
+                    create_temp_dir_failed
+                ));
+            }
+        }
+    }
+
+    #[test]
+    fn encrypt_decrypt() {
+        let setup_result = setup();
+
+        if let Ok((dir, encryption)) = setup_result {
+            let file_path = dir.path().join("test.txt");
+            let content = "Hello, i'm a test";
+            let file = File::create(&file_path);
+
+            if let Ok(mut created_file) = file {
+                let _ = writeln!(created_file, "{}", content);
+            } else {
+                assert!(false);
+            }
+
+            let file_path_str_option = file_path.to_str();
+
+            if let Some(file_path_str) = file_path_str_option {
+                let file_path_str = file_path_str.to_string();
+                let _ = encryption.handle_encrypt(&file_path_str);
+                let _ = encryption.handle_decrypt(&format!("{}.enc", file_path_str));
+
+                let decrypted_file_result = File::open(file_path);
+                if let Ok(mut decrypted_file) = decrypted_file_result {
+                    let mut decrypted_content = String::new();
+                    let _ = decrypted_file.read_to_string(&mut decrypted_content);
+                    assert_eq!(decrypted_content.trim_end(), content);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn file_dont_exist() {
+        let (_, encryption) = setup().unwrap();
+        let file_path = "fake_file_path.txt";
+        let result = encryption.handle_decrypt(&file_path.to_string());
+        assert!(result.is_err());
+
+        let result = encryption.handle_encrypt(&file_path.to_string());
+        assert!(result.is_err());
+    }
+}
