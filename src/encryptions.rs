@@ -36,27 +36,36 @@ impl<'a> Encryption<'a> {
                         let rest = decrypter.finalize(&mut decrypted_data[count..])?;
                         decrypted_data.truncate(count + rest);
 
-                        let decrypted_file_name = option.clone();
-                        let decrypted_file_name: Vec<&str> =
-                            decrypted_file_name.split("/").collect();
+                        let decrypted_file_path = option.clone();
+                        let decrypted_file_path: Vec<&str> =
+                            decrypted_file_path.split("/").collect();
+
                         let decrypted_file_name =
-                            decrypted_file_name.get(decrypted_file_name.len() - 1);
+                            decrypted_file_path.get(decrypted_file_path.len() - 1);
 
-                        if let Some(file_name) = decrypted_file_name {
-                            println!("{:?}", file_name);
+                        // Obtain everything but the last item.
+                        let decrypted_file_dir =
+                            decrypted_file_path.get(0..decrypted_file_path.len() - 2);
 
-                            let file_name: Vec<&str> = file_name.split(".").collect();
-                            let file_name = file_name.get(0..2);
+                        match (decrypted_file_name, decrypted_file_dir) {
+                            (Some(file_name), Some(file_dir)) => {
+                                let file_name: Vec<&str> = file_name.split(".").collect();
+                                let file_name = file_name.get(0..2);
 
-                            if let Some(file_strs) = file_name {
-                                let finalized_file_name = file_strs.join(".");
+                                if let Some(file_strs) = file_name {
+                                    let finalized_file_name =
+                                        format!("{}/{}", file_dir.join("/"), file_strs.join("."));
 
-                                let mut output_file = File::create(finalized_file_name.clone())?;
-                                output_file.write_all(&decrypted_data)?;
+                                    let mut output_file =
+                                        File::create(finalized_file_name.clone())?;
+                                    output_file.write_all(&decrypted_data)?;
+                                    return Ok(());
+                                } else {
+                                    Err(anyhow!("Unabled to parse file name"))
+                                }
                             }
+                            _ => Err(anyhow!("Couldn't parse file name and dir")),
                         }
-
-                        return Ok(());
                     }
                     Err(e) => {
                         return Err(anyhow!("Couldn't read file content {}", e));
@@ -96,6 +105,7 @@ impl<'a> Encryption<'a> {
 
                         let encrypted_file_name = option.clone() + ".enc";
                         let mut output_file = File::create(encrypted_file_name)?;
+
                         let _ = output_file.write(&encrypted_data)?;
 
                         return Ok(());
@@ -117,80 +127,47 @@ mod encryption_tests {
     use std::io::Read;
 
     use super::*;
-    use tempfile::tempdir;
+    use tempfile::NamedTempFile;
 
-    fn setup() -> Result<(tempfile::TempDir, Encryption<'static>), Error> {
-        let dir = tempdir();
+    fn setup() -> (tempfile::NamedTempFile, Encryption<'static>) {
+        let temp_file = NamedTempFile::new().expect("Failed to create tempfile");
 
-        match dir {
-            Ok(temp_dir) => {
-                let key = b"lkwiekfgmjwkdjalwprktlwudkskdmkw";
-                let iv = b"koskemwldkowmekw";
-                let encryption = Encryption::new(&key, &iv);
-                return Ok((temp_dir, encryption));
-            }
-            Err(create_temp_dir_failed) => {
-                assert!(false);
-                return Err(anyhow!(
-                    "Unable to create temp directory {}",
-                    create_temp_dir_failed
-                ));
-            }
-        }
+        let key = b"lkwiekfgmjwkdjalwprktlwudkskdmkw";
+        let iv = b"koskemwldkowmekw";
+        let encryption = Encryption::new(&key, &iv);
+        return (temp_file, encryption);
     }
 
     #[test]
     fn encrypt_decrypt() {
-        let setup_result = setup();
+        let (mut temp_file, encryption) = setup();
 
-        if let Ok((dir, encryption)) = setup_result {
-            let file_path = dir.path().join("test.txt");
-            let content = "Hello, i'm a test";
-            let file = File::create(&file_path);
+        let content = "Hello, i'm a test";
 
-            if let Ok(mut created_file) = file {
-                let _ = writeln!(created_file, "{}", content);
-            } else {
-                assert!(false);
-            }
+        let _ = writeln!(temp_file, "{}", content);
+        let temp_file_path = temp_file
+            .path()
+            .to_str()
+            .expect("Failed to convert file path to string");
 
-            let file_path_str_option = file_path.to_str();
+        let _ = encryption.handle_encrypt(&String::from(temp_file_path));
+        let _ = encryption.handle_decrypt(&format!("{}.enc", temp_file_path));
 
-            if let Some(file_path_str) = file_path_str_option {
-                let file_path_str = file_path_str.to_string();
-                let _ = encryption.handle_encrypt(&file_path_str);
-                let _ = encryption.handle_decrypt(&format!("{}.enc", file_path_str));
+        let mut decrypted_file_result = File::open(&temp_file).expect("Failed to open temp file");
+        let mut decrypted_content = String::new();
+        let _ = decrypted_file_result.read_to_string(&mut decrypted_content);
 
-                let decrypted_file_result = File::open(file_path);
-                if let Ok(mut decrypted_file) = decrypted_file_result {
-                    let mut decrypted_content = String::new();
-                    let _ = decrypted_file.read_to_string(&mut decrypted_content);
-                    assert_eq!(decrypted_content.trim_end(), content);
-                }
-            }
-        } else {
-            println!("Setup failed");
-            assert!(false);
-        }
+        assert_eq!(decrypted_content.trim_end(), content);
     }
 
     #[test]
     fn file_dont_exist() {
-        let setup_result = setup();
+        let (_, encryption) = setup();
+        let file_path = "fake_file_path.txt";
+        let result = encryption.handle_decrypt(&file_path.to_string());
+        assert!(result.is_err());
 
-        match setup_result {
-            Ok((_, encryption)) => {
-                let file_path = "fake_file_path.txt";
-                let result = encryption.handle_decrypt(&file_path.to_string());
-                assert!(result.is_err());
-
-                let result = encryption.handle_encrypt(&file_path.to_string());
-                assert!(result.is_err());
-            }
-            Err(_) => {
-                println!("Setup failed");
-                assert!(false);
-            }
-        }
+        let result = encryption.handle_encrypt(&file_path.to_string());
+        assert!(result.is_err());
     }
 }
