@@ -46,8 +46,7 @@ mod gitclean_tests {
     use tempfile::NamedTempFile;
 
     fn setup() -> tempfile::NamedTempFile {
-        let temp_file = NamedTempFile::new().expect("Failed to create temp file");
-        return temp_file;
+        return NamedTempFile::new().expect("Failed to create temp file");
     }
 
     #[test]
